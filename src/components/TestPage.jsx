@@ -2,9 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import QuestionCard from './QuestionCard';
-import { supabase } from '../supaBaseClient'; // Adjust the import path as necessary
 
-const TestPage = ({ title, questions }) => {
+const TestPage = ({ title, questions, nextTest, assessmentType }) => {
   const [allResponses, setAllResponses] = useState({});
   const [currentPage, setCurrentPage] = useState(0);
   const location = useLocation();
@@ -31,7 +30,7 @@ const TestPage = ({ title, questions }) => {
       ...allResponses,
       [testType]: {
         ...(allResponses[testType] || {}),
-        [questionIndex]: selectedOption,
+        [`q${questionIndex + 1}`]: selectedOption,
       },
     };
     setAllResponses(newAllResponses);
@@ -43,6 +42,12 @@ const TestPage = ({ title, questions }) => {
   const currentTestResponses = allResponses[testType] || {};
 
   const handleNextQuestion = () => {
+    // Check if current question is answered
+    if (!currentTestResponses[`q${currentPage + 1}`]) {
+      alert('Please answer the current question before proceeding.');
+      return;
+    }
+
     if (currentPage < questions.length - 1) {
       // If not the last question, go to next question
       setCurrentPage(currentPage + 1);
@@ -53,31 +58,44 @@ const TestPage = ({ title, questions }) => {
   };
 
   const handleSubmitTest = async () => {
+    // Check if all questions are answered
+    const unansweredQuestions = questions
+      .map((_, index) => index)
+      .filter(index => !currentTestResponses[`q${index + 1}`]);
+
+    if (unansweredQuestions.length > 0) {
+      alert(`Please answer all questions before submitting. Unanswered: ${unansweredQuestions.map(i => i + 1).join(', ')}`);
+      return;
+    }
+
     try {
       const userToken = localStorage.getItem('userToken');
-      
+
       if (!userToken) {
         navigate('/login');
         return;
       }
 
-      const submissionData = {
-        access_token: userToken,
-        section: testType,
-        answers: currentTestResponses
-      };
+      const response = await fetch('/api/responses', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          accessToken: userToken,
+          section: testType,
+          answers: currentTestResponses,
+          assessmentType: assessmentType || 'regular',
+        }),
+      });
 
-      const { error } = await supabase
-        .from('responses')
-        .insert([submissionData]);
-
-      if (error) {
-        throw error;
+      if (!response.ok) {
+        throw new Error('Failed to save responses');
       }
 
       // Reset current page for next test
       setCurrentPage(0);
-      
+
       // Navigate to next test
       const nextTest = getNextTest(testType);
       navigate(nextTest);
@@ -89,6 +107,11 @@ const TestPage = ({ title, questions }) => {
   };
 
   const getNextTest = (currentTest) => {
+    // Use nextTest prop if provided, otherwise use default flow
+    if (nextTest) {
+      return nextTest;
+    }
+
     const testFlow = {
       'personality': '/intelligences',
       'intelligences': '/career',
@@ -112,7 +135,7 @@ const TestPage = ({ title, questions }) => {
         <QuestionCard
           question={currentQuestion}
           index={currentPage}
-          selectedOption={currentTestResponses[currentPage]}
+          selectedOption={currentTestResponses[`q${currentPage + 1}`]}
           onResponse={handleResponse}
           testType={testType}
         />
@@ -153,7 +176,7 @@ const TestPage = ({ title, questions }) => {
               className={`p-2 rounded border ${
                 i === currentPage
                   ? 'bg-blue-600 text-white'
-                  : currentTestResponses[i]
+                  : currentTestResponses[`q${i + 1}`]
                   ? 'bg-green-500 text-white'
                   : 'bg-gray-200'
               }`}

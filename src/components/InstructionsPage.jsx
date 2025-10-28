@@ -7,8 +7,13 @@ const InstructionsPage = () => {
   const handleStart = () => {
     // Set flag that user has seen instructions
     localStorage.setItem('hasSeenInstructions', 'true');
-    // Navigate to first test
-    navigate('/personality');
+    // Navigate to first test based on assessment type
+    const assessmentType = localStorage.getItem('assessmentType') || 'general';
+    if (assessmentType === 'vhsc') {
+      navigate('/vhsc-aptitude');
+    } else {
+      navigate('/aptitude');
+    }
   };
 
   return (

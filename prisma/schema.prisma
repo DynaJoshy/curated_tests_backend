@@ -1,0 +1,49 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model AccessToken {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique
+  is_used   Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+}
+
+model User {
+  id                   Int      @id @default(autoincrement())
+  name                 String
+  phoneNo              String   @map("phone_no")
+  currentQualification String   @map("current_qualification")
+  email                String   @unique
+  accessToken          String   @map("access_token")
+}
+
+model Response {
+  id          Int      @id @default(autoincrement())
+  accessToken String   @map("access_token")
+  section     String
+  answers     Json
+}
+
+model StreamAssessment {
+  id                   Int      @id @default(autoincrement())
+  accessToken          String   @map("access_token")
+  aptitudeScores       Json     @map("aptitude_scores") // { numerical: 0-100, verbal: 0-100, spatial: 0-100, mechanical: 0-100, logical: 0-100 }
+  interestScores       Json     @map("interest_scores") // RIASEC { R: 0-100, I: 0-100, A: 0-100, S: 0-100, E: 0-100, C: 0-100 }
+  academicPerformance  Json     @map("academic_performance") // { maths: 0-100, science: 0-100, english: 0-100, socialScience: 0-100, languages: 0-100 }
+  personalityTraits    Json     @map("personality_traits") // Big Five { openness: 0-100, conscientiousness: 0-100, extraversion: 0-100, agreeableness: 0-100, neuroticism: 0-100 }
+  contextualInputs     Json     @map("contextual_inputs") // { careerAwareness: 0-100, resourceAccess: 0-100, parentalSupport: 0-100 }
+  createdAt            DateTime @default(now()) @map("created_at")
+}
+
+model Report {
+  id          Int      @id @default(autoincrement())
+  accessToken String   @map("access_token")
+  pdfData     Bytes
+  createdAt   DateTime @default(now()) @map("created_at")
+}

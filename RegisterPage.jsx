@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "./src/supaBaseClient";
 
 const RegisterPage = () => {
   const [email, setEmail] = useState("");
@@ -8,14 +7,7 @@ const RegisterPage = () => {
   const navigate = useNavigate();
 
   const handleRegister = async () => {
-    const { error } = await supabase.auth.signUp({ email, password });
-    if (error) {
-      console.error("Registration failed:", error.message);
-      alert("❌ Registration failed. Please try again.");
-    } else {
-      alert("🎉 Registration successful! Redirecting to the first test...");
-      navigate("/personality"); // Redirect to the first test
-    }
+    alert("Registration is currently disabled. Please contact the administrator.");
   };
 
   return (

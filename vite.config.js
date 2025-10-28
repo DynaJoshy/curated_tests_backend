@@ -6,6 +6,7 @@ export default defineConfig({
   base: '/',
   build: {
     outDir: 'dist',
+    chunkSizeWarningLimit: 2000,
     sourcemap: false,
     minify: 'terser',
     terserOptions: {
@@ -22,14 +23,16 @@ export default defineConfig({
         assetFileNames: '[name]-[hash].[ext]',
         manualChunks: {
           'react-vendor': ['react', 'react-dom'],
-          'router': ['react-router-dom'],
-          'supabase': ['@supabase/supabase-js']
+          'router': ['react-router-dom']
         }
       }
     }
   },
   server: {
     port: 3000,
+    proxy: {
+      '/api': 'http://localhost:5000'
+    },
     hmr: {
       overlay: false
     },
@@ -38,8 +41,7 @@ export default defineConfig({
     }
   },
   optimizeDeps: {
-    include: ['react', 'react-dom', 'react-router-dom', '@supabase/supabase-js'],
-    exclude: ['@supabase/supabase-js']
+    include: ['react', 'react-dom', 'react-router-dom']
   },
   esbuild: {
     logOverride: { 'this-is-undefined-in-esm': 'silent' }

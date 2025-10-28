@@ -1,26 +1,25 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../supaBaseClient';
 
 const LoginPage = () => {
   const [token, setToken] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [assessmentType, setAssessmentType] = useState('regular');
   const navigate = useNavigate();
 
   const clearPreviousResponses = async (userToken) => {
     try {
       // Clear responses from localStorage
       localStorage.removeItem('all_test_responses');
-      
-      // Clear responses from database for this token
-      const { error: deleteError } = await supabase
-        .from('responses')
-        .delete()
-        .eq('access_token', userToken);
 
-      if (deleteError) {
-        console.error('Error clearing previous responses:', deleteError);
+      // Clear responses from database for this token
+      const response = await fetch(`/api/responses/${userToken}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        console.error('Error clearing previous responses');
       }
     } catch (err) {
       console.error('Error in clearPreviousResponses:', err);
@@ -31,53 +30,50 @@ const LoginPage = () => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
-    
+
     try {
-      // First, check if the token exists in the access_tokens table
-      const { data: tokenData, error: tokenError } = await supabase
-        .from('access_tokens')
-        .select('*')
-        .eq('token', token)
-        .maybeSingle();
+      // First check if this is a VHSC token by trying to fetch VHSC assessment data
+      const vhscResponse = await fetch(`/api/reports/${token.trim().toUpperCase()}`);
+      let isVHSC = false;
 
-      if (tokenError) {
-        console.error('Token verification error:', tokenError);
-        setError('Error verifying token. Please try again.');
-        setIsLoading(false);
-        return;
+      if (vhscResponse.ok) {
+        const vhscData = await vhscResponse.json();
+        if (vhscData.assessmentType === 'vhsc') {
+          isVHSC = true;
+        }
       }
 
-      if (!tokenData) {
-        setError('Invalid token. Please check your token and try again.');
-        setIsLoading(false);
-        return;
-      }
+      // If not VHSC, verify as regular token
+      if (!isVHSC) {
+        const response = await fetch('/api/tokens/verify', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ token: token.trim().toUpperCase() }),
+        });
 
-      if (tokenData.is_used) {
-        setError('This token has already been used. Please contact support for a new token.');
-        setIsLoading(false);
-        return;
+        if (!response.ok) {
+          const errorData = await response.json();
+          setError(errorData.error || 'Invalid token. Please check your token and try again.');
+          setIsLoading(false);
+          return;
+        }
       }
 
       // Store token in localStorage
-      localStorage.setItem('userToken', token);
-      
+      localStorage.setItem('userToken', token.trim().toUpperCase());
+      localStorage.setItem('assessmentType', isVHSC ? 'vhsc' : 'regular');
+
       // Clear any previous responses for this token
-      await clearPreviousResponses(token);
-      
-      // Mark token as used
-      const { error: updateError } = await supabase
-        .from('access_tokens')
-        .update({ is_used: true })
-        .eq('token', token);
+      await clearPreviousResponses(token.trim().toUpperCase());
 
-      if (updateError) {
-        console.error('Error updating token:', updateError);
-        // Don't return here, as the user is already logged in
+      // Navigate to appropriate instructions page
+      if (isVHSC) {
+        navigate('/vhsc-instructions');
+      } else {
+        navigate('/instructions');
       }
-
-      // Navigate to instructions page
-      navigate('/instructions');
     } catch (err) {
       console.error('Login failed:', err);
       setError('Something went wrong. Please try again.');
@@ -87,34 +83,58 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      <div className="p-8 bg-white rounded-lg shadow-md w-96">
-        <h1 className="text-2xl font-bold mb-6 text-center">Enter Access Token</h1>
-        {error && (
-          <div className="mb-4 p-2 bg-red-100 text-red-600 rounded">
-            {error}
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            Access Your Assessment
+          </h1>
+          <p className="text-gray-600">
+            Enter your access token to start the career assessment
+          </p>
+        </div>
+
+        <form onSubmit={handleLogin} className="space-y-6">
+          <div>
+            <label htmlFor="token" className="block text-sm font-medium text-gray-700 mb-2">
+              Access Token
+            </label>
+            <input
+              type="text"
+              id="token"
+              value={token}
+              onChange={(e) => setToken(e.target.value.toUpperCase())}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent uppercase"
+              placeholder="Enter your access token"
+              maxLength="8"
+              required
+              disabled={isLoading}
+            />
           </div>
-        )}
-        <form onSubmit={handleLogin}>
-          <input
-            type="text"
-            value={token}
-            onChange={(e) => setToken(e.target.value)}
-            className="w-full p-2 mb-4 border rounded"
-            placeholder="Enter your access token"
-            required
-            disabled={isLoading}
-          />
+
+          {error && (
+            <div className="text-red-600 text-sm text-center">
+              {error}
+            </div>
+          )}
+
           <button
             type="submit"
-            className={`w-full p-2 bg-blue-600 text-white rounded hover:bg-blue-700 ${
-              isLoading ? 'opacity-50 cursor-not-allowed' : ''
-            }`}
             disabled={isLoading}
+            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 px-4 rounded-lg font-semibold hover:from-blue-700 hover:to-indigo-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
           >
-            {isLoading ? 'Verifying...' : 'Access Tests'}
+            {isLoading ? 'Verifying Token...' : 'Start Assessment'}
           </button>
         </form>
+
+        <div className="mt-6 text-center">
+          <button
+            onClick={() => navigate('/')}
+            className="text-gray-600 hover:text-gray-800 text-sm underline"
+          >
+            ← Back to Home
+          </button>
+        </div>
       </div>
     </div>
   );

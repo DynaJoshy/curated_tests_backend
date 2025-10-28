@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { supabaseAdmin } from '../supaBaseClient';
-import { generateToken } from '../utils/tokenGenerator';
 
 const AdminPage = () => {
   const [tokens, setTokens] = useState([]);
@@ -25,16 +23,11 @@ const AdminPage = () => {
   const fetchTokens = async () => {
     try {
       setIsLoading(true);
-      const { data, error } = await supabaseAdmin
-        .from('access_tokens')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching tokens:', error);
-        setError('Failed to fetch tokens. Please try again.');
-        return;
+      const response = await fetch('/api/tokens');
+      if (!response.ok) {
+        throw new Error('Failed to fetch tokens');
       }
+      const data = await response.json();
       setTokens(data);
     } catch (err) {
       console.error('Error in fetchTokens:', err);
@@ -48,55 +41,22 @@ const AdminPage = () => {
     try {
       setIsGenerating(true);
       setError('');
-      
-      // Generate token
-      const newToken = generateToken();
-      console.log('Generated token:', newToken);
 
-      // Check if token already exists
-      const { data: existingToken, error: checkError } = await supabaseAdmin
-        .from('access_tokens')
-        .select('token')
-        .eq('token', newToken)
-        .maybeSingle();
+      const response = await fetch('/api/tokens', {
+        method: 'POST',
+      });
 
-      if (checkError) {
-        console.error('Error checking existing token:', checkError);
-        setError('Error checking token availability. Please try again.');
-        return;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate token');
       }
 
-      if (existingToken) {
-        console.log('Token already exists, generating new one...');
-        return generateNewToken(); // Recursively try again with a new token
-      }
-
-      // Insert new token
-      const { data, error } = await supabaseAdmin
-        .from('access_tokens')
-        .insert([{ 
-          token: newToken,
-          is_used: false
-        }])
-        .select();
-
-      if (error) {
-        console.error('Token generation error:', error);
-        if (error.code === '23505') {
-          setError('Token already exists. Please try again.');
-        } else if (error.code === '42501') {
-          setError('Permission denied. Please check your database permissions.');
-        } else {
-          setError(`Failed to generate token: ${error.message}`);
-        }
-        return;
-      }
-
+      const data = await response.json();
       console.log('Successfully generated token:', data);
       await fetchTokens();
     } catch (err) {
       console.error('Error in generateNewToken:', err);
-      setError('An unexpected error occurred while generating token.');
+      setError(`An unexpected error occurred while generating token: ${err.message || err}`);
     } finally {
       setIsGenerating(false);
     }
@@ -109,15 +69,13 @@ const AdminPage = () => {
 
     try {
       setError('');
-      const { error } = await supabaseAdmin
-        .from('access_tokens')
-        .delete()
-        .eq('id', tokenId);
+      const response = await fetch(`/api/tokens/${tokenId}`, {
+        method: 'DELETE',
+      });
 
-      if (error) {
-        console.error('Error deleting token:', error);
-        setError('Failed to delete token. Please try again.');
-        return;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete token');
       }
 
       await fetchTokens();
@@ -193,7 +151,7 @@ const AdminPage = () => {
               <tr key={token.id} className="border-t">
                 <td className="p-2">{token.token}</td>
                 <td className="p-2">
-                  {new Date(token.created_at).toLocaleString()}
+                  {new Date(token.createdAt).toLocaleString()}
                 </td>
                 <td className="p-2">
                   <span className={`px-2 py-1 rounded ${
