@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-
+// done reportError
 export const Registration = () => {
   const [name, setName] = useState("");
   const [phoneNo, setPhoneNo] = useState("");
